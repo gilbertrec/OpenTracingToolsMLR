@@ -116,6 +116,7 @@ def getArticleUrlListwithTag(thetag):
                         for url in urls:
                             tempinput = []
                             theid, thedate, thetitle = getArticleIdDateTitle(url)
+                            print(thedate)
                             tempinput.append(theid)
                             tempinput.append(thedate)
                             tempinput.append(thetitle)
@@ -216,7 +217,7 @@ def getArticleUrlListwithTagYearCheck(thetag, year_tocheck):
 
 
 # This method scrape all medium results of a tag in a predefined year and a predefined month.
-
+# doesn't work still
 def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
     theurl = f"https://medium.com/tag/{thetag}/archive"
     req = Request(theurl, headers=headers)
@@ -251,45 +252,64 @@ def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
                 month_bsObj = BeautifulSoup(month_html, 'lxml')
 
                 days = month_bsObj.find_all('div', {'class': 'timebucket u-inlineBlock u-width35'})
-                if days:
-                    with open(
+                with open(
                         f"{get_directory(year_number, month_number)}/{thetag}_medium_{year_tocheck}_{month_number}.csv",
                         'w') as csvfile:
-                        writer = csv.writer(csvfile, delimiter=',')
-                        writer.writerow(['id', 'date', 'title', 'text'])
-                for day in days:
-                    try:
-                        if (day.find('a') == None):
+                    writer = csv.writer(csvfile, delimiter=',')
+                    writer.writerow(['id', 'date', 'title', 'text'])
+                if days:
+                    for day in days:
+                        try:
+                            if (day.find('a') == None):
+                                continue
+                            day_req = Request(day.find('a').get('href'), headers=headers)
+                            day_html = urlopen(day_req).read()
+                            day_bsObj = BeautifulSoup(day_html, 'lxml')
+                            #select the 'Read More...' objects inside the page
+                            urls = [x.get('href') for x in day_bsObj.find_all('a', {
+                                'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
+                            # articleurls.extend(urls)
+                            for url in urls:
+                                tempinput = []
+                                theid, thedate, thetitle = getArticleIdDateTitle(url)
+                                tempinput.append(theid)
+                                tempinput.append(thedate)
+                                tempinput.append(thetitle)
+                                tempinput.append(getArticleContent(url))
+                                with open(
+                                        f"{get_directory(year_number, month_number)}/{thetag}_medium_{year_tocheck}_{month_number}.csv",
+                                        'a') as csvfile:
+                                    writer = csv.writer(csvfile, delimiter=',')
+                                    writer.writerow(tempinput)
+                                count = count + 1
+                                print(count)
+                            del day_req
+                            del day_html
+                            del day_bsObj
+                        except (requests.ConnectionError, requests.Timeout) as exception:
+                            print("poor or no internet connection.")
+                        except:
                             continue
-                        day_req = Request(day.find('a').get('href'), headers=headers)
-                        day_html = urlopen(day_req).read()
-                        day_bsObj = BeautifulSoup(day_html, 'lxml')
-                        urls = [x.get('href') for x in day_bsObj.find_all('a', {
-                            'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
-                        # articleurls.extend(urls)
-                        for url in urls:
-                            tempinput = []
-                            theid, thedate, thetitle = getArticleIdDateTitle(url)
-                            tempinput.append(theid)
-                            tempinput.append(thedate)
-                            tempinput.append(thetitle)
-                            tempinput.append(getArticleContent(url))
-                            with open(
-                                    f"{get_directory(year_number, month_number)}/{thetag}_medium_{year_tocheck}_{month_number}.csv",
-                                    'a') as csvfile:
-                                writer = csv.writer(csvfile, delimiter=',')
-                                writer.writerow(tempinput)
-                            count = count + 1
-                            print(count)
-                        del day_req
-                        del day_html
-                        del day_bsObj
-                    except (requests.ConnectionError, requests.Timeout) as exception:
-                        print("poor or no internet connection.")
-                    except:
-                        continue
 
-                del days
+                    del days
+                else:
+                    #in this case we have that medium doesn't collect data for each day, but collecting all the article in the whole month
+                    urls = [x.get('href') for x in month_bsObj.find_all('a', {
+                        'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
+                    for url in urls:
+                        tempinput = []
+                        theid, thedate, thetitle = getArticleIdDateTitle(url)
+                        tempinput.append(theid)
+                        tempinput.append(thedate)
+                        tempinput.append(thetitle)
+                        tempinput.append(getArticleContent(url))
+                        with open(
+                                f"{get_directory(year_number, month_number)}/{thetag}_medium_{year_tocheck}_{month_number}.csv",
+                                'a') as csvfile:
+                            writer = csv.writer(csvfile, delimiter=',')
+                            writer.writerow(tempinput)
+                        count = count + 1
+                        print(count)
                 del month_req
                 del month_html
                 del month_bsObj
@@ -322,9 +342,11 @@ def getArticleUrlListwithTagContinue(thetag):
                 month_req = Request(month.find('a').get('href'), headers=headers)
                 month_html = urlopen(month_req).read()
                 month_bsObj = BeautifulSoup(month_html, 'lxml')
+
                 days = month_bsObj.find_all('div', {'class': 'timebucket u-inlineBlock u-width35'})
                 for day in days:
                     try:
+
                         day_req = Request(day.find('a').get('href'), headers=headers)
                         day_html = urlopen(day_req).read()
                         day_bsObj = BeautifulSoup(day_html, 'lxml')
@@ -389,11 +411,8 @@ def get_directory(year, month):
         os.makedirs(path)
     return path
 
-# main function to run the web crawling grouping by month
-# Input: Username relative to year_check.csv folder, to choose which type of tag and years you want to crawl
-# Output: Create a folder results grouped by year and month for each crawl dataset.
 
-def WebCrawlAssignedMonth(username):
+def WebScrapeAssignedMonth(username):
     print(f'Hi {username}!')
     df = pd.read_csv('year_tocheck.csv')
     df_user_part = df[df['AssignedTo'] == username]
@@ -423,7 +442,7 @@ def WebCrawlAssignedMonth(username):
 
 
 
-def WebCrawlAssigned(username):
+def WebScrapeAssigned(username):
     print(f'Hi {username}!')
     df = pd.read_csv('year_tocheck.csv')
     df_user_part = df[df['AssignedTo'] == username]
@@ -448,4 +467,4 @@ def WebCrawlAssigned(username):
 
 
 
-WebCrawlAssignedMonth('GilbertoPC1')
+WebScrapeAssignedMonth('GilbertoPC1')
