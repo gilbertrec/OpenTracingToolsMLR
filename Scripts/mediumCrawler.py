@@ -52,13 +52,23 @@ def readArticleLink(link):
 
 def getArticleIdDateTitle(link):
     req = Request(link, headers=headers)
-    html = urlopen(req).read()
+    try:
+        html = urlopen(req).read()
+    except (HTTPError , URLError):
+        raise ValueError("This site doesn't exists anymore!")
     # html = urlopen(link, context=context, header = )
     bsObj = BeautifulSoup(html, 'lxml')
-    title = bsObj.find('script', {'type': 'application/ld+json'})
-    maintext = title.get_text()
+    try:
+        title = bsObj.find('script', {'type': 'application/ld+json'})
+        maintext = title.get_text()
+    except :
+        raise ValueError("This site is without content")
+
     jsontext = json.loads(maintext)
-    return jsontext['identifier'], jsontext['datePublished'], jsontext['headline'],
+    if 'identifier' in jsontext.keys():
+        return jsontext['identifier'], jsontext['datePublished'], jsontext['headline'],
+    else:
+        raise ValueError("This site is not an article")
 
 
 def getArticleDate(link):
@@ -115,7 +125,10 @@ def getArticleUrlListwithTag(thetag):
                         # articleurls.extend(urls)
                         for url in urls:
                             tempinput = []
-                            theid, thedate, thetitle = getArticleIdDateTitle(url)
+                            try:
+                                theid, thedate, thetitle = getArticleIdDateTitle(url)
+                            except:
+                                continue
                             print(thedate)
                             tempinput.append(theid)
                             tempinput.append(thedate)
@@ -184,7 +197,10 @@ def getArticleUrlListwithTagYearCheck(thetag, year_tocheck):
                             'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
                         for url in urls:
                             tempinput = []
-                            theid, thedate, thetitle = getArticleIdDateTitle(url)
+                            try:
+                                theid, thedate, thetitle = getArticleIdDateTitle(url)
+                            except ValueError:
+                                continue
                             print(thedate + " is " + int(thedate[0:4]))
                             tempinput.append(theid)
                             tempinput.append(thedate)
@@ -218,13 +234,12 @@ def getArticleUrlListwithTagYearCheck(thetag, year_tocheck):
 
 # This method scrape all medium results of a tag in a predefined year and a predefined month.
 # doesn't work still
-def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
+def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck, month_tocheck):
     theurl = f"https://medium.com/tag/{thetag}/archive"
     req = Request(theurl, headers=headers)
     html = urlopen(req).read()
     bsObj = BeautifulSoup(html, 'lxml')
     years = bsObj.find_all('div', {'class': 'timebucket u-inlineBlock u-width50'})
-
     count = 0
     for year in years:
         year_number = int(year.find('a').get_text())
@@ -239,8 +254,9 @@ def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
         year_html = urlopen(year_req).read()
         year_bsObj = BeautifulSoup(year_html, 'lxml')
         months = year_bsObj.find_all('div', {'class': 'timebucket u-inlineBlock u-width80'})
-        for month in months:
-                if(month.find('a')== None):
+        if months:
+            for month in months:
+                if (month.find('a') == None):
                     continue
                 month_number = int(datetime.datetime.strptime(month.find('a').get_text(), "%B").month)
                 if month_number != month_tocheck:
@@ -265,13 +281,16 @@ def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
                             day_req = Request(day.find('a').get('href'), headers=headers)
                             day_html = urlopen(day_req).read()
                             day_bsObj = BeautifulSoup(day_html, 'lxml')
-                            #select the 'Read More...' objects inside the page
+                            # select the 'Read More...' objects inside the page
                             urls = [x.get('href') for x in day_bsObj.find_all('a', {
                                 'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
                             # articleurls.extend(urls)
                             for url in urls:
                                 tempinput = []
-                                theid, thedate, thetitle = getArticleIdDateTitle(url)
+                                try:
+                                    theid, thedate, thetitle = getArticleIdDateTitle(url)
+                                except ValueError:
+                                    continue
                                 tempinput.append(theid)
                                 tempinput.append(thedate)
                                 tempinput.append(thetitle)
@@ -293,12 +312,15 @@ def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
 
                     del days
                 else:
-                    #in this case we have that medium doesn't collect data for each day, but collecting all the article in the whole month
+                    # in this case we have that medium doesn't collect data for each day, but collecting all the article in the whole month
                     urls = [x.get('href') for x in month_bsObj.find_all('a', {
                         'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
                     for url in urls:
                         tempinput = []
-                        theid, thedate, thetitle = getArticleIdDateTitle(url)
+                        try:
+                            theid, thedate, thetitle = getArticleIdDateTitle(url)
+                        except ValueError:
+                            continue
                         tempinput.append(theid)
                         tempinput.append(thedate)
                         tempinput.append(thetitle)
@@ -313,10 +335,31 @@ def getArticleUrlListwithTagYearMonthCheck(thetag, year_tocheck,month_tocheck):
                 del month_req
                 del month_html
                 del month_bsObj
-        del months
-        del year_req
-        del year_html
-        del year_bsObj
+            del months
+            del year_req
+            del year_html
+            del year_bsObj
+        else:
+            urls = [x.get('href') for x in year_bsObj.find_all('a', {
+                'class': 'button button--smaller button--chromeless u-baseColor--buttonNormal'})]
+            for url in urls:
+                tempinput = []
+                try:
+                    theid, thedate, thetitle = getArticleIdDateTitle(url)
+                except ValueError:
+                    continue
+                tempinput.append(theid)
+                tempinput.append(thedate)
+                tempinput.append(thetitle)
+                tempinput.append(getArticleContent(url))
+                with open(
+                        f"{get_directory(year_number, 1)}/{thetag}_medium_{year_tocheck}_{1}.csv",
+                        'a') as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',')
+                    writer.writerow(tempinput)
+                count = count + 1
+                print(count)
+            return 13  # this is a bad tech debt. return error code in case there aren't month to notify that it's useless to reiterate other months to the caller.
 
 
 def getArticleUrlListwithTagContinue(thetag):
@@ -414,7 +457,7 @@ def get_directory(year, month):
 
 def WebScrapeAssignedMonth(username):
     print(f'Hi {username}!')
-    df = pd.read_csv('year_tocheck.csv')
+    df = pd.read_csv('year_tocheck_recovery.csv')
     df_user_part = df[df['AssignedTo'] == username]
     num_df_total = len(df_user_part)
     df_remaining_part = df_user_part[df_user_part['Completed'] == False]
@@ -427,44 +470,20 @@ def WebScrapeAssignedMonth(username):
         year = df_line['Year'].values[0]
         tag = df_line['Tag'].values[0]
         month = df_line['Month'].values[0]
-        index=month
+        index = month
         print(f'Starting to scrape {tag} in {year}')
-        while index<12:
-            print(f'Month:{index+1}')
-            getArticleUrlListwithTagYearMonthCheck(tag, year,index+1)
-            df.loc[id - 1, 'Month'] = index+1
+        while index < 12:
+            print(f'Month:{index + 1}')
+            result_code = getArticleUrlListwithTagYearMonthCheck(tag, year, index + 1)
+            if result_code == 13:
+                index = 12
+            df.loc[id - 1, 'Month'] = index + 1
             df.to_csv('year_tocheck.csv', index=False)
-            index=index+1
+            index = index + 1
         df.loc[id - 1, 'Completed'] = True
-        df.to_csv('year_tocheck.csv', index=False)
+        df.to_csv('year_tocheck_recovery.csv', index=False)
         num_df_remaining = num_df_remaining - 1
         print(f"We have completed {year} dataset, now we have only to do {num_df_remaining}")
-
-
-
-def WebScrapeAssigned(username):
-    print(f'Hi {username}!')
-    df = pd.read_csv('year_tocheck.csv')
-    df_user_part = df[df['AssignedTo'] == username]
-    num_df_total = len(df_user_part)
-    df_remaining_part = df_user_part[df_user_part['Completed'] == False]
-    num_df_remaining = len(df_remaining_part)
-    print(f"We have to actually scrape the remaining {num_df_remaining} parts out of {num_df_total}, "
-          f"thank you for your support.")
-    id_list_to_do = df_remaining_part['IdRun'].values
-    for id in id_list_to_do:
-        df_line = df_remaining_part[df_remaining_part['IdRun'] == id]
-        year = df_line['Year'].values[0]
-        tag = df_line['Tag'].values[0]
-        month = df_line['Month'].values[0]
-        index=month
-        print(f'Starting to scrape {tag} in {year}')
-        getArticleUrlListwithTagYearCheck(tag,year)
-        df.loc[id - 1, 'Completed'] = True
-        df.to_csv('year_tocheck.csv', index=False)
-        num_df_remaining = num_df_remaining - 1
-        print(f"We have completed {year} dataset, now we have only to do {num_df_remaining}")
-
 
 
 WebScrapeAssignedMonth('GilbertoPC1')
